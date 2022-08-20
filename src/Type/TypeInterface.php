@@ -35,7 +35,8 @@ interface TypeInterface
    * Check type of the value
    * @param mixed $typeDetails the same value that was returned by getTypeDetails
    * @param mixed $value
+   * @param string $path to the value for error message
    * @return string a human-readable error message or empty string if type matches
    */
-  public static function check($typeDetails, $value): string;
+  public static function check($typeDetails, $value, string $path): string;
 }

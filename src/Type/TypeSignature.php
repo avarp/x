@@ -19,7 +19,7 @@ final class TypeSignature implements \JsonSerializable
    * @var object known names of types
    */
   private static $types = [
-    'matchLiteralOrder' => [
+    'matchLiteral' => [
       AnyType::class,
       IntType::class,
       FloatType::class,
@@ -33,7 +33,7 @@ final class TypeSignature implements \JsonSerializable
       VariantsType::class,
       RecordType::class
     ],
-    'inferOrder' => [
+    'infer' => [
       BoolType::class,
       FloatType::class,
       IntType::class,
@@ -51,29 +51,33 @@ final class TypeSignature implements \JsonSerializable
 
   /**
    * Register custom type
-   * @param string $type name of the class implementing TypeInterface
-   * @param string $beforeThisWhenConstruct 
-   * @param string $beforeThisWhenInfer 
+   * @param string $typeClass name of the class implementing TypeInterface
    */
-  public static function registerType(string $type, string $beforeThisWhenConstruct = '', string $beforeThisWhenInfer = ''): void
+  public static function registerType(string $typeClass): void
   {
-    if (!class_exists($type)) Error::classNotExist("Class $type does not exist.");
-    if (!in_array(TypeInterface::class, class_implements($type))) error(Error::CLASS_ILLEGAL, "Class $type does not implement ".TypeInterface::class.".");
-    if (false !== $pos = array_search($type, self::$constructableTypes)) {
-      array_splice(self::$constructableTypes, $pos, 1);
+    if (!class_exists($typeClass)) Error::classNotExist("Class $typeClass does not exist.");
+    if (!in_array(TypeInterface::class, class_implements($typeClass))) Error::incompatibleClass("Class $typeClass does not implement ".TypeInterface::class.".");
+    
+    if (!in_array($typeClass, self::$types['matchLiteral'])) {
+      if (defined($typeClass.'::MATCH_LITERAL_BEFORE')) {
+        $before = $typeClass::MATCH_LITERAL_BEFORE;
+        if (false !== $pos = array_search($before, self::$types['matchLiteral'])) {
+          array_splice(self::$types['matchLiteral'], $pos, 0, $typeClass);
+        } else {
+          self::$types['matchLiteral'][] = $type;
+        }
+      }
     }
-    if (false !== $pos = array_search($type, self::$inferrableTypes)) {
-      array_splice(self::$inferrableTypes, $pos, 1);
-    }
-    if ($beforeThisWhenConstruct && false !== $pos = array_search($beforeThisWhenConstruct, self::$constructableTypes)) {
-      array_splice(self::$constructableTypes, $pos, 0, $type);
-    } else {
-      self::$constructableTypes[] = $type;
-    }
-    if ($beforeThisWhenInfer && false !== $pos = array_search($beforeThisWhenInfer, self::$inferrableTypes)) {
-      array_splice(self::$inferrableTypes, $pos, 0, $type);
-    } else {
-      self::$inferrableTypes[] = $type;
+
+    if (!in_array($typeClass, self::$types['infer'])) {
+      if (defined($typeClass.'::INFER_BEFORE')) {
+        $before = $typeClass::INFER_BEFORE;
+        if (false !== $pos = array_search($before, self::$types['infer'])) {
+          array_splice(self::$types['infer'], $pos, 0, $typeClass);
+        } else {
+          self::$types['infer'][] = $type;
+        }
+      }
     }
   }
 
@@ -93,14 +97,26 @@ final class TypeSignature implements \JsonSerializable
     }
 
     // search for literal match
-    foreach (self::$types->matchLiteralOrder as $type) if ($type::matchLiteral($literal)) {
+    foreach (self::$types['matchLiteral'] as $type) if ($type::matchLiteral($literal)) {
       $this->type = $type;
       break;
     }
-    if (!$this->type) error(Error::INCORRECT_TYPE_SIGNATURE, 'Type signature is incorrect.');
+    if (!$this->type) Error::unknownTypeSignature('Type signature is unknown.');
 
     // get details of the type
     $this->details = $this->type::getTypeDetails($literal, $context);
+  }
+
+
+  /**
+   * Check if the literal is known
+   * @param mixed $literal literal form of the type
+   * @return bool
+   */
+  public static function isKnownLiteral($literal): bool
+  {
+    foreach (self::$types['matchLiteral'] as $type) if ($type::matchLiteral($literal)) return true;
+    return false;
   }
 
 
@@ -149,7 +165,7 @@ final class TypeSignature implements \JsonSerializable
    */
   public static function infer($value): TypeSignature
   {
-    foreach (self::$inferrableTypes as $type) if ($result = $type::infer($value)) {
+    foreach (self::$types['infer'] as $type) if ($result = $type::infer($value)) {
       return $result;
     }
     return AnyType::infer($value);
@@ -159,8 +175,8 @@ final class TypeSignature implements \JsonSerializable
   /**
    * Type check
    */
-  public function check($value): string
+  public function check($value, $path='Value'): string
   {
-    return $this->type::check($value);
+    return $this->type::check($this->details, $value, $path);
   }
 }
