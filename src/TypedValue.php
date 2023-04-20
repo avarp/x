@@ -1,8 +1,6 @@
 <?php declare(strict_types=1);
 namespace Precise;
 
-use Exception;
-
 abstract class TypedValue
 {
   /**
@@ -13,12 +11,12 @@ abstract class TypedValue
   /**
    * @var ?array type of the instance
    */
-  protected ?array $itype = null;
+  protected ?array $_type = null;
 
   /**
-   * @var mixed internal representation of the instance
+   * @var array internal representation of the instance
    */
-  protected $ir = null;
+  protected array $_ir = [];
 
   /**
    * Create a typed value
@@ -30,26 +28,27 @@ abstract class TypedValue
   {
     // Get type
     if (static::$type) {
-      $this->itype = static::$type;
+      $this->_type = static::$type;
     } elseif ($type) {
-      $this->itype = $type;
+      $this->_type = $type;
     } else {
-      throw new Exception('Please specify type of the typed value', ERR::TYPE_NOT_DEFINED);
+      err('Please specify type of the typed value', TYPE_NOT_DEFINED);
     }
 
     // Check type
-    if ($unsafe == false && Type::getComplexTypeClass($this->itype) != static::class) {
-      throw new Exception('Given type doesn\'t match the typed value class', ERR::TYPE_DOESNT_MATCH);
+    if ($unsafe == false && Type::getComplexTypeClass($this->_type) != static::class) {
+      err('Given type doesn\'t match the typed value class', TYPE_DOESNT_MATCH);
     }
 
     // Check values
-    if ($unsafe == false && !static::checkType($this->itype, $values)) {
-      throw new TypeError(static::$lastTypeError, ERR::TYPE_ERROR);
+    if ($unsafe == false && !static::checkType($this->_type, $values)) {
+      err(static::$lastTypeError, TYPE_ERROR);
     }
   }
 
   /**
    * Check if the value matches the type
+   * @internal
    * @param array $type a complex type signature
    * @param mixed $value to check
    * @param string $path the name of variable for error messages
@@ -70,7 +69,7 @@ abstract class TypedValue
    */
   public function getType(): ?array
   {
-    return $this->itype;
+    return $this->_type;
   }
 
   /**
@@ -80,6 +79,7 @@ abstract class TypedValue
 
   /**
    * Get last type error
+   * @internal
    * @return string
    */
   public static function getLastTypeError(): string
@@ -93,12 +93,9 @@ abstract class TypedValue
    */
   public function toArray(bool $recursive = false): array
   {
-    if (!is_array($this->ir)) {
-      throw new Exception('Internal representation is not an array', ERR::IR_ISNT_ARRAY);
-    }
     if ($recursive) {
       $result = [];
-      foreach ($this->ir as $key => $value) {
+      foreach ($this->_ir as $key => $value) {
         if (is_object($value) && $value instanceof TypedValue) {
           $result[$key] = $value->toArray(true);
         } else {
@@ -107,7 +104,7 @@ abstract class TypedValue
       }
       return $result;
     } else {
-      return $this->ir;
+      return $this->_ir;
     }
   }
 }

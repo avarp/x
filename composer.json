@@ -12,7 +12,11 @@
   "autoload": {
     "psr-4": {
       "Precise\\": "src/"
-    }
+    },
+    "files": [
+      "src/functions.php",
+      "src/errorCodes.php"
+    ]
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0"

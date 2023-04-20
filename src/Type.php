@@ -1,13 +1,11 @@
 <?php declare(strict_types=1);
 namespace Precise;
 
-use Exception;
-
 abstract class Type
 {
   private static string $lastError = '';
   private static array $scalarTypes = [];
-  private static array $complexTypes = [];
+  private static array $complexTypes = ['map' => Map::class];
   private static array $reservedWords = ['any', 'bool', 'int', 'float', 'string'];
 
   /**
@@ -23,7 +21,7 @@ abstract class Type
       key_exists($name, self::$scalarTypes) ||
       key_exists($name, self::$complexTypes)
     ) {
-      throw new Exception("Type \"$name\" already exists.", ERR::TYPE_ALREADY_EXISTS);
+      err("Type \"$name\" already exists.", TYPE_ALREADY_EXISTS);
     }
 
     // Register scalar type
@@ -32,10 +30,7 @@ abstract class Type
         self::$complexTypes[$name] = $definition;
         return;
       } else {
-        throw new Exception(
-          "Class \"$definition\" must implement interface \"" . TypedValue::class . '"',
-          ERR::NOT_A_TYPED_VALUE
-        );
+        err("Class \"$definition\" must implement interface \"" . TypedValue::class . '"', NOT_A_TYPED_VALUE);
       }
     }
 
@@ -46,7 +41,7 @@ abstract class Type
     }
 
     // Unknown type definition
-    throw new Exception('Unknown type definition.', ERR::UNKNOWN_TYPE);
+    err('Unknown type definition.', UNKNOWN_TYPE);
   }
 
   /**
@@ -109,19 +104,6 @@ abstract class Type
   }
 
   /**
-   * Create type error message
-   * @param string $path the name of variable for error messages
-   * @param string $expectedType
-   * @param mixed $actualValue
-   */
-  public static function errMsg(string $path, string $expectedType, $actualValue): string
-  {
-    return "$path is expected to be $expectedType but it is " .
-      (is_scalar($actualValue) ? (string) $actualValue : gettype($actualValue)) .
-      '.';
-  }
-
-  /**
    * Type checking
    * @param mixed $type type signature
    * @param mixed $value to check
@@ -142,7 +124,7 @@ abstract class Type
         if (is_bool($value)) {
           return true;
         } else {
-          self::$lastError = self::errMsg($path, 'a boolean value', $value);
+          self::$lastError = errMsg($path, 'a boolean value', $value);
           return false;
         }
       }
@@ -152,7 +134,7 @@ abstract class Type
         if (is_int($value)) {
           return true;
         } else {
-          self::$lastError = self::errMsg($path, 'an integer', $value);
+          self::$lastError = errMsg($path, 'an integer', $value);
           return false;
         }
       }
@@ -162,7 +144,7 @@ abstract class Type
         if (is_int($value) || is_float($value)) {
           return true;
         } else {
-          self::$lastError = self::errMsg($path, 'an integer or a floating-point value', $value);
+          self::$lastError = errMsg($path, 'an integer or a floating-point value', $value);
           return false;
         }
       }
@@ -172,7 +154,7 @@ abstract class Type
         if (is_string($value)) {
           return true;
         } else {
-          self::$lastError = self::errMsg($path, 'a string', $value);
+          self::$lastError = errMsg($path, 'a string', $value);
           return false;
         }
       }
@@ -182,7 +164,7 @@ abstract class Type
         if (is_object($value) && get_class($value) === $type) {
           return true;
         } else {
-          self::$lastError = self::errMsg($path, 'an instance of "' . $type . '"', $value);
+          self::$lastError = errMsg($path, 'an instance of "' . $type . '"', $value);
           return false;
         }
       }
@@ -192,7 +174,7 @@ abstract class Type
         if (self::$scalarTypes[$type]($value)) {
           return true;
         } else {
-          self::$lastError = self::errMsg($path, 'a value with type "' . $type . '"', $value);
+          self::$lastError = errMsg($path, 'a value with type "' . $type . '"', $value);
           return false;
         }
       }
@@ -200,6 +182,13 @@ abstract class Type
 
     // Complex types
     elseif (is_array($type)) {
+      if ($value instanceof TypedValue) {
+        if ($type == $value->getType()) {
+          return true;
+        } else {
+          self::$lastError = "$path is a typed value with incompatible type.";
+        }
+      }
       $typeClass = self::getComplexTypeClass($type);
       if ($typeClass) {
         if ($typeClass::checkType($type, $value, $path)) {
@@ -211,7 +200,7 @@ abstract class Type
       }
     }
 
-    throw new Exception('Unknown type signature.', ERR::UNKNOWN_TYPE);
+    err('Unknown type signature.', UNKNOWN_TYPE);
   }
 
   /**

@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
+namespace Precise;
 use PHPUnit\Framework\TestCase;
-use Precise\{Type, ListOf, ERR};
 
 class ListOfTest extends TestCase
 {
@@ -12,19 +12,19 @@ class ListOfTest extends TestCase
 
   public function testConstruct2()
   {
-    $this->expectExceptionCode(ERR::TYPE_NOT_DEFINED);
+    $this->expectExceptionCode(TYPE_NOT_DEFINED);
     $list = new ListOf([true, false]);
   }
 
   public function testConstruct3()
   {
-    $this->expectExceptionCode(ERR::TYPE_DOESNT_MATCH);
+    $this->expectExceptionCode(TYPE_DOESNT_MATCH);
     $list = new ListOf([true, false], ['bool', 'bool']);
   }
 
   public function testConstruct4()
   {
-    $this->expectExceptionCode(ERR::TYPE_ERROR);
+    $this->expectExceptionCode(TYPE_ERROR);
     $list = new ListOf([true, 'false'], ['bool']);
   }
 
@@ -53,7 +53,7 @@ class ListOfTest extends TestCase
 
   public function testOffsetGet2()
   {
-    $this->expectExceptionCode(ERR::OFFSET_DOESNT_EXIST);
+    $this->expectExceptionCode(OFFSET_DOESNT_EXIST);
     $list = new ListOf([1, 2, 3], ['int']);
     $x = $list[3];
   }
@@ -76,14 +76,14 @@ class ListOfTest extends TestCase
 
   public function testOffsetSet2()
   {
-    $this->expectExceptionCode(ERR::OFFSET_OUT_OF_BOUNDS);
+    $this->expectExceptionCode(OFFSET_OUT_OF_BOUNDS);
     $list = new ListOf([1, 2, 3], ['int']);
     $list[4] = 5;
   }
 
   public function testOffsetSet3()
   {
-    $this->expectExceptionCode(ERR::TYPE_ERROR);
+    $this->expectExceptionCode(TYPE_ERROR);
     $list = new ListOf([1, 2, 3], ['int']);
     $list[3] = 5.5;
   }
@@ -100,7 +100,7 @@ class ListOfTest extends TestCase
 
   public function testOffsetUnset2()
   {
-    $this->expectExceptionCode(ERR::OFFSET_OUT_OF_BOUNDS);
+    $this->expectExceptionCode(OFFSET_OUT_OF_BOUNDS);
     $list = new ListOf([1, 2, 3], ['int']);
     unset($list[5]);
   }

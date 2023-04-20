@@ -3,13 +3,13 @@ namespace Precise;
 
 use ArrayAccess;
 use Countable;
-use Exception;
-use InvalidArgumentException;
 use Iterator;
-use TypeError;
 
 class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
 {
+  use Traits\Countable;
+  use Traits\Iterator;
+
   /**
    * Create a typed list
    * @param array $values
@@ -21,31 +21,15 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
     parent::__construct($values, $type, $unsafe);
 
     // Save values
-    $elementsType = $this->itype[0];
-    if (Type::isScalar($elementsType)) {
-      if ($elementsType == 'float') {
-        // Typecast integers to float values
-        foreach ($values as $v) {
-          $this->ir[] = (float) $v;
-        }
-      } else {
-        $this->ir = $values;
-      }
-    } else {
-      $typeClass = Type::getComplexTypeClass($elementsType);
-      if ($typeClass) {
-        $this->ir = [];
-        foreach ($values as $v) {
-          $this->ir[] = new $typeClass($v, $elementsType, true);
-        }
-      } else {
-        throw new Exception('Unknown type of elements.', ERR::UNKNOWN_TYPE);
-      }
+    $elementsType = $this->_type[0];
+    foreach ($values as $v) {
+      $this->_ir[] = purify($elementsType, $v);
     }
   }
 
   /**
-   * Check if the value is a typed list. Method is only for internal purposes.
+   * Check if the value is a typed list.
+   * @internal
    * @param array $type a complex type signature
    * @param mixed $value to check
    * @param string $path the name of variable for error messages
@@ -54,11 +38,11 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
   public static function checkType(array $type, $value, string $path = '$value'): bool
   {
     if (!is_array($value)) {
-      self::$lastTypeError = Type::errMsg($path, 'an array', $value);
+      self::$lastTypeError = errMsg($path, 'an array', $value);
       return false;
     }
     if (!array_is_list($value)) {
-      self::$lastTypeError = Type::errMsg($path, 'a list', $value);
+      self::$lastTypeError = errMsg($path, 'a list', $value);
       return false;
     }
     $elementsType = $type[0];
@@ -78,19 +62,13 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
   public function equal($value): bool
   {
     if (
-      (is_array($value) && count($value) == count($this->ir)) ||
-      (is_object($value) && $value instanceof TypedValue && $value->getType() == $this->itype)
+      (is_array($value) && count($value) == count($this->_ir)) ||
+      (is_object($value) && $value instanceof TypedValue && $value->getType() == $this->_type)
     ) {
       foreach ($value as $i => $v2) {
-        $v1 = $this->ir[$i];
-        if (Type::isScalar($this->itype[0])) {
-          if ($v1 !== $v2) {
-            return false;
-          }
-        } else {
-          if (!$v1->equal($v2)) {
-            return false;
-          }
+        $v1 = $this->_ir[$i];
+        if (!equal($v1, $v2, $this->_type[0])) {
+          return false;
         }
       }
       return true;
@@ -99,19 +77,11 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
   }
 
   /**
-   * Countable::count implementation
-   */
-  public function count(): int
-  {
-    return count($this->ir);
-  }
-
-  /**
    * ArrayAccess::offsetExists implementation
    */
   public function offsetExists($offset): bool
   {
-    return key_exists($offset, $this->ir);
+    return key_exists($offset, $this->_ir);
   }
 
   /**
@@ -119,10 +89,10 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function offsetGet($offset): mixed
   {
-    if (!key_exists($offset, $this->ir)) {
-      throw new Exception("Offset \"$offset\" does not exist.", ERR::OFFSET_DOESNT_EXIST);
+    if (!key_exists($offset, $this->_ir)) {
+      err("Offset \"$offset\" does not exist.", OFFSET_DOESNT_EXIST);
     }
-    return $this->ir[$offset];
+    return $this->_ir[$offset];
   }
 
   /**
@@ -132,15 +102,16 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
   {
     // check offset
     if (is_null($offset)) {
-      $offset = count($this->ir);
-    } elseif (!is_int($offset) || $offset < 0 || $offset > count($this->ir)) {
-      throw new Exception("Offset \"$offset\" is out of bounds.", ERR::OFFSET_OUT_OF_BOUNDS);
+      $offset = count($this->_ir);
+    } elseif (!is_int($offset) || $offset < 0 || $offset > count($this->_ir)) {
+      err("Offset \"$offset\" is out of bounds.", OFFSET_OUT_OF_BOUNDS);
     }
     // check value
-    if (Type::check($this->itype[0], $value, "\$value[$offset]")) {
-      $this->ir[$offset] = $value;
+    $elementsType = $this->_type[0];
+    if (Type::check($elementsType, $value)) {
+      $this->_ir[$offset] = purify($elementsType, $value);
     } else {
-      throw new TypeError(Type::getLastError(), ERR::TYPE_ERROR);
+      err(Type::getLastError(), TYPE_ERROR);
     }
   }
 
@@ -149,50 +120,10 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function offsetUnset($offset): void
   {
-    if (!is_int($offset) || $offset < 0 || $offset > count($this->ir) - 1) {
-      throw new Exception("Offset \"$offset\" is out of bounds.", ERR::OFFSET_OUT_OF_BOUNDS);
+    if (!is_int($offset) || $offset < 0 || $offset > count($this->_ir) - 1) {
+      err("Offset \"$offset\" is out of bounds.", OFFSET_OUT_OF_BOUNDS);
     }
-    array_splice($this->ir, $offset, 1);
-  }
-
-  /**
-   * Iterator::current implementation
-   */
-  public function current(): mixed
-  {
-    return current($this->ir);
-  }
-
-  /**
-   * Iterator::key implementation
-   */
-  public function key(): mixed
-  {
-    return key($this->ir);
-  }
-
-  /**
-   * Iterator::next implementation
-   */
-  public function next(): void
-  {
-    next($this->ir);
-  }
-
-  /**
-   * Iterator::rewind implementation
-   */
-  public function rewind(): void
-  {
-    reset($this->ir);
-  }
-
-  /**
-   * Iterator::valid implementation
-   */
-  public function valid(): bool
-  {
-    return !is_null(key($this->ir));
+    array_splice($this->_ir, $offset, 1);
   }
 
   /**
@@ -201,8 +132,8 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function chunk(int $length): ListOf
   {
-    $chunks = array_chunk($this->ir, $length);
-    return new ListOf($chunks, [$this->itype], true);
+    $chunks = array_chunk($this->_ir, $length);
+    return new ListOf($chunks, [$this->_type], true);
   }
 
   /**
@@ -253,26 +184,23 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
     $otherLists = [];
     foreach ($args as $i => $arg) {
       if ($arg instanceof TypedValue) {
-        if ($arg->getType() == $this->itype) {
+        if ($arg->getType() == $this->_type) {
           $otherLists[] = $arg->toArray();
         } else {
-          throw new InvalidArgumentException(
-            "Argument #$i has different type than the original list.",
-            ERR::LIST_DIFF_TYPE_ERR
-          );
+          err("Argument #$i has different type than the original list.", LIST_DIFF_TYPE_ERROR);
         }
       } else {
         if (is_array($arg) && array_is_list($arg)) {
-          if (self::checkType($this->itype, $arg, "\$args[$i]")) {
+          if (self::checkType($this->_type, $arg, "\$args[$i]")) {
             $otherLists[] = $arg;
           } else {
-            throw new InvalidArgumentException(self::$lastTypeError, ERR::LIST_DIFF_TYPE_ERR);
+            err(self::$lastTypeError, LIST_DIFF_TYPE_ERROR);
           }
         }
       }
     }
     $otherLists[] = $areEqual;
-    return new ListOf(array_udiff($this->ir, ...$otherLists));
+    return new ListOf(array_udiff($this->_ir, ...$otherLists));
   }
 
   /**
@@ -307,10 +235,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
     if (!is_string($start) && !is_string($end)) {
       return new ListOf(range($start, $end, $step), ['float']);
     }
-    throw new InvalidArgumentException(
-      'Parameters\' types are incompatible with each other',
-      ERR::LIST_RANGE_WRONG_PARAMS
-    );
+    err('Parameters\' types are incompatible with each other', LIST_RANGE_WRONG_PARAMS);
   }
 
   /**
@@ -320,7 +245,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function filter(callable $filter): ListOf
   {
-    return new ListOf(array_values(array_filter($this->ir, $filter)), $this->itype, true);
+    return new ListOf(array_values(array_filter($this->_ir, $filter)), $this->_type, true);
   }
 
   /**
@@ -348,13 +273,13 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function includes($value): bool
   {
-    if (count($this->ir) == 0) {
+    if (count($this->_ir) == 0) {
       return false;
     }
-    if (Type::isScalar($this->itype[0])) {
-      return in_array($value, $this->ir, true);
+    if (Type::isScalar($this->_type[0])) {
+      return in_array($value, $this->_ir, true);
     } else {
-      return in_array(serialize($value), array_map('serialize', $this->ir));
+      return in_array(serialize($value), array_map('serialize', $this->_ir));
     }
   }
 
@@ -393,7 +318,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function pop(): ListOf
   {
-    array_pop($this->ir);
+    array_pop($this->_ir);
     return $this;
   }
 
@@ -403,12 +328,12 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function product(): int|float
   {
-    if ($this->itype[0] == 'int' || $this->itype[0] == 'float') {
-      return array_product($this->ir);
+    if ($this->_type[0] == 'int' || $this->_type[0] == 'float') {
+      return array_product($this->_ir);
     } else {
-      throw new Exception(
+      err(
         'The product of values can be calculated only for lists of numbers (int or float).',
-        ERR::LIST_PRODUCT_FAIL
+        LIST_PRODUCT_FAIL
       );
     }
   }
@@ -451,7 +376,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function reverse(): ListOf
   {
-    $this->ir = array_reverse($this->ir);
+    $this->_ir = array_reverse($this->_ir);
     return $this;
   }
 
@@ -470,7 +395,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function shift(): ListOf
   {
-    array_shift($this->ir);
+    array_shift($this->_ir);
     return $this;
   }
 
@@ -482,7 +407,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function slice(int $offset, ?int $length = null): ListOf
   {
-    return new ListOf(array_slice($this->ir, $offset, $length), $this->itype, true);
+    return new ListOf(array_slice($this->_ir, $offset, $length), $this->_type, true);
   }
 
   /**
@@ -502,12 +427,12 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function sum(): int|float
   {
-    if ($this->itype[0] == 'int' || $this->itype[0] == 'float') {
-      return array_sum($this->ir);
+    if ($this->_type[0] == 'int' || $this->_type[0] == 'float') {
+      return array_sum($this->_ir);
     } else {
-      throw new Exception(
+      err(
         'The sum of values can be calculated only for lists of numbers (int or float).',
-        ERR::LIST_SUM_FAIL
+        LIST_SUM_FAIL
       );
     }
   }
