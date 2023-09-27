@@ -7,6 +7,8 @@ use Iterator;
 
 class Map extends TypedValue implements Countable, ArrayAccess, Iterator
 {
+  use Traits\MapMethods;
+
   /**
    * Create a map
    * @param array $array
@@ -45,6 +47,7 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
 
   /**
    * Convert map to array of pairs
+   * @param bool $recursive true for recursive conversion.
    * @return array
    */
   public function toArray(bool $recursive = false): array
@@ -83,6 +86,9 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
 
   /**
    * Convert map to an associative array
+   * @param bool $recursive true for recursive conversion.
+   * @param bool $strict if true, it throws an exception for maps that can't be converted. Otherwise it uses toArray as a fallback.
+   * @param string $path name of variable for error message.
    * @return array
    */
   public function toAssocArray(bool $recursive = false, bool $strict = false, string $path = '$this'): array
@@ -189,6 +195,7 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
   /**
    * Equality check
    * @param mixed $value
+   * @return bool
    */
   public function equal(mixed $value): bool
   {
