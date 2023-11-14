@@ -1,8 +1,7 @@
 <?php declare(strict_types=1);
-namespace Precise\Traits;
-use function Precise\err;
+namespace Precise;
 
-trait MapMethods
+trait MethodsForMap
 {
   /**
    * Change case of keys. Works only with string keys.
@@ -13,7 +12,7 @@ trait MapMethods
   {
     $keysType = $this->_type[1];
     if ($keysType != 'string') {
-      err(__FUNCTION__ . ' can be called only to maps with string keys.', \Precise\MAP_MUST_HAVE_STRING_KEYS);
+      err(__FUNCTION__ . ' can be called only to maps with string keys.', MAP_MUST_HAVE_STRING_KEYS);
     }
     $this->_ir['keys'] = array_map($case == CASE_LOWER ? strtolower(...) : strtoupper(...), $this->_ir['keys']);
     $this->_ir['strKeys'] = array_map(self::keyToString(...), $this->_ir['keys']);

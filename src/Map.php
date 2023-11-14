@@ -1,13 +1,9 @@
 <?php declare(strict_types=1);
 namespace Precise;
 
-use ArrayAccess;
-use Countable;
-use Iterator;
-
-class Map extends TypedValue implements Countable, ArrayAccess, Iterator
+class Map extends TypedValue implements \Countable, \ArrayAccess, \Iterator
 {
-  use Traits\MapMethods;
+  use MethodsForMap;
 
   /**
    * Create a map
@@ -47,21 +43,39 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
 
   /**
    * Convert map to array of pairs
-   * @param bool $recursive true for recursive conversion.
-   * @return array
+   * @return mixed
    */
-  public function toArray(bool $recursive = false): array
+  public function jsonSerialize(): mixed
   {
     $result = [];
     $n = 0;
     foreach ($this->_ir['values'] as $value) {
-      if ($recursive && is_object($value) && $value instanceof TypedValue) {
-        $value = $value->toArray(true);
+      if (is_object($value) && $value instanceof TypedValue) {
+        $value = $value->jsonSerialize();
       }
       $key = $this->_ir['keys'][$n++];
       $result[] = [$key, $value];
     }
     return $result;
+  }
+
+  /**
+   * Convert map to array of pairs
+   * @return array
+   */
+  public function toArray(bool $recursive = false): array
+  {
+    if ($recursive) {
+      return $this->jsonSerialize();
+    } else {
+      $result = [];
+      $n = 0;
+      foreach ($this->_ir['values'] as $value) {
+        $key = $this->_ir['keys'][$n++];
+        $result[] = [$key, $value];
+      }
+      return $result;
+    }
   }
 
   /**
@@ -118,7 +132,7 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
           }
           $value = $value->toAssocArray(true, $strict, $path);
         } else {
-          $value = $value->toArray(true);
+          $value = $value->jsonSerialize();
         }
       }
       if ($usePairs) {
@@ -199,7 +213,7 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
    */
   public function equal(mixed $value): bool
   {
-    if (is_array($value) || (is_object($value) && $value instanceof Map && $value->getType() == $this->_type)) {
+    if (is_array($value) || (is_object($value) && $value instanceof self && $value->getType() == $this->_type)) {
       // Fast check on count
       if (count($this) != count($value)) {
         return false;
@@ -300,7 +314,7 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
       ksort($key);
     }
     if ($key instanceof TypedValue) {
-      $key = $key->toArray(true);
+      $key = $key->jsonSerialize(true);
     }
     if (array_is_list($key)) {
       return 'l:' . md5(implode('', array_map(self::keyToString(...), $key)));
@@ -387,8 +401,8 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
   {
     // check offset
     $keysType = $this->_type[1];
-    if (!Type::check($keysType, $value)) {
-      err(Type::getLastError(), TYPE_ERROR);
+    if (!Type::check($keysType, $offset, 'Offset')) {
+      err(Type::getLastError(), TYPE_MISMATCH);
     }
     // check value
     $valuesType = $this->_type[2];
@@ -397,7 +411,7 @@ class Map extends TypedValue implements Countable, ArrayAccess, Iterator
       $this->_ir['keys'][] = $offset;
       $this->_ir['values'][self::keyToString($offset)] = purify($valuesType, $value);
     } else {
-      err(Type::getLastError(), TYPE_ERROR);
+      err(Type::getLastError(), TYPE_MISMATCH);
     }
   }
 

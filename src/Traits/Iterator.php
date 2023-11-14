@@ -1,5 +1,5 @@
 <?php declare(strict_types=1);
-namespace Precise\Traits;
+namespace Precise;
 
 trait Iterator
 {

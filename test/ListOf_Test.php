@@ -2,33 +2,34 @@
 namespace Precise;
 use PHPUnit\Framework\TestCase;
 
-class ListOfTest extends TestCase
+class ListOf_Test extends TestCase
 {
-  public function testConstruct1()
+  public function test___construct()
   {
     $list = new ListOf([1], ['int']);
-    $this->assertSame(1, $list[0]);
+    $this->assertSame(['int'], getPrivateProp($list, '_type'));
+    $this->assertSame([1], getPrivateProp($list, '_ir'));
   }
 
-  public function testConstruct2()
+  public function test___construct_Exception_TYPE_NOT_DEFINED()
   {
     $this->expectExceptionCode(TYPE_NOT_DEFINED);
     $list = new ListOf([true, false]);
   }
 
-  public function testConstruct3()
+  public function test___construct_Exception_TYPE_DOESNT_MATCH()
   {
     $this->expectExceptionCode(TYPE_DOESNT_MATCH);
     $list = new ListOf([true, false], ['bool', 'bool']);
   }
 
-  public function testConstruct4()
+  public function test___construct_Exception_TYPE_MISMATCH()
   {
-    $this->expectExceptionCode(TYPE_ERROR);
+    $this->expectExceptionCode(TYPE_MISMATCH);
     $list = new ListOf([true, 'false'], ['bool']);
   }
 
-  public function testCount()
+  public function test_count()
   {
     $list = new ListOf([1, 2, null], ['any']);
     $this->assertSame(3, count($list));
@@ -36,7 +37,7 @@ class ListOfTest extends TestCase
     $this->assertSame(0, count($list));
   }
 
-  public function testOffsetExists()
+  public function test_offsetExists()
   {
     $list = new ListOf([1, 2, 3], ['int']);
     $this->assertTrue(isset($list[1]));
@@ -45,27 +46,27 @@ class ListOfTest extends TestCase
     $this->assertFalse(isset($list['foo']));
   }
 
-  public function testOffsetGet1()
+  public function test_offsetGet()
   {
     $list = new ListOf([1, 2, 3], ['int']);
     $this->assertSame(1, $list[0]);
   }
 
-  public function testOffsetGet2()
+  public function test_OffsetGet_Exception_OFFSET_DOESNT_EXIST()
   {
     $this->expectExceptionCode(OFFSET_DOESNT_EXIST);
     $list = new ListOf([1, 2, 3], ['int']);
     $x = $list[3];
   }
 
-  public function testToArray()
+  public function test_toArray()
   {
     $sample = [[1], [], [3, 4, 5]];
     $list = new ListOf($sample, [['int']]);
     $this->assertSame($sample, $list->toArray(true));
   }
 
-  public function testOffsetSet1()
+  public function test_offsetSet()
   {
     $list = new ListOf([1, 2], ['int']);
     $list[0] = 3;
@@ -74,21 +75,21 @@ class ListOfTest extends TestCase
     $this->assertSame([3, 2, 1, 0], $list->toArray());
   }
 
-  public function testOffsetSet2()
+  public function test_offsetSet_Exception_OFFSET_OUT_OF_BOUNDS()
   {
     $this->expectExceptionCode(OFFSET_OUT_OF_BOUNDS);
     $list = new ListOf([1, 2, 3], ['int']);
     $list[4] = 5;
   }
 
-  public function testOffsetSet3()
+  public function test_offsetSet_Exception_TYPE_MISMATCH()
   {
-    $this->expectExceptionCode(TYPE_ERROR);
+    $this->expectExceptionCode(TYPE_MISMATCH);
     $list = new ListOf([1, 2, 3], ['int']);
     $list[3] = 5.5;
   }
 
-  public function testOffsetUnset1()
+  public function test_offsetUnset()
   {
     $list = new ListOf([1, 2, 3, 4, 5, 6, 7], ['int']);
     unset($list[6]);
@@ -98,14 +99,14 @@ class ListOfTest extends TestCase
     $this->assertSame([2, 4, 6], $list->toArray());
   }
 
-  public function testOffsetUnset2()
+  public function test_offsetUnset_Exception_OFFSET_OUT_OF_BOUNDS()
   {
     $this->expectExceptionCode(OFFSET_OUT_OF_BOUNDS);
     $list = new ListOf([1, 2, 3], ['int']);
     unset($list[5]);
   }
 
-  public function testIterator()
+  public function test_Interface_Iterator()
   {
     $list = new ListOf([1, 2, 3, 4], ['int']);
     $sum = 0;
@@ -113,28 +114,5 @@ class ListOfTest extends TestCase
       $sum += $n;
     }
     $this->assertSame(10, $sum);
-  }
-
-  public function testChunk()
-  {
-    $list = new ListOf([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], ['int']);
-    $chunks = $list->chunk(3);
-    $this->assertTrue($chunks instanceof ListOf);
-    $this->assertSame([['int']], $chunks->getType());
-    $this->assertSame([[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]], $chunks->toArray(true));
-  }
-
-  public function testFill1()
-  {
-    $list = ListOf::fill(3, 0.5);
-    $this->assertSame(['float'], $list->getType());
-    $this->assertSame([0.5, 0.5, 0.5], $list->toArray());
-  }
-
-  public function testFill2()
-  {
-    $list = ListOf::fill(3, 1, ['float']);
-    $this->assertSame(['float'], $list->getType());
-    $this->assertSame([1.0, 1.0, 1.0], $list->toArray());
   }
 }

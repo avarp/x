@@ -2,7 +2,7 @@
 namespace Precise;
 use PHPUnit\Framework\TestCase;
 
-class MapTest extends TestCase
+class Map_Test extends TestCase
 {
   public function test___construct()
   {
@@ -133,5 +133,86 @@ class MapTest extends TestCase
     $this->assertFalse($map->equal(new Map(['pi' => 3, 'e' => 2], ['map', 'string', 'int'])));
     $this->assertFalse($map->equal(new Map(['pi' => 3.14, 'e' => 2.7, 'f' => 1.6], ['map', 'string', 'float'])));
     $this->assertFalse($map->equal(['pi' => 2.7, 'e' => 3.14]));
+  }
+
+  public function test_Interface_Iterator()
+  {
+    $map = new Map([
+      [true, [1, 2, 3, 4]],
+      [false, [5, 6]]
+    ], ['map', 'bool', ['int']]);
+    $sum = 0;
+    foreach ($map as $k => $ints) {
+      if ($k) {
+        foreach ($ints as $int) {
+          $sum += $int;
+        }
+      }
+    }
+    $this->assertSame(10, $sum);
+  }
+
+  public function test_count()
+  {
+    $map = new Map([[true, 1], [true, 2], [false, 3]], ['map', 'bool', 'int']);
+    $this->assertSame(2, count($map));
+  }
+
+  public function test_offsetExists()
+  {
+    $map = new Map(['pi' => 3.14, 'e' => 2.7], ['map', 'string', 'float']);
+    $this->assertTrue(isset($map['pi']));
+    $this->assertFalse(isset($map['x']));
+    $this->assertFalse(isset($map[42]));
+  }
+
+  public function test_offsetGet()
+  {
+    $map = new Map(['zero' => 0, 'one' => 1, 'two' => 2], ['map', 'string', 'int']);
+    $this->assertSame(0, $map['zero']);
+    $this->assertSame(1, $map['one']);
+    $this->assertSame(2, $map['two']);
+  }
+
+  public function test_OffsetGet_Exception_OFFSET_DOESNT_EXIST()
+  {
+    $this->expectExceptionCode(OFFSET_DOESNT_EXIST);
+    $map = new Map(['zero' => 0, 'one' => 1, 'two' => 2], ['map', 'string', 'int']);
+    $x = $map['three'];
+  }
+
+  public function test_offsetSet()
+  {
+    $map = new Map([], ['map', 'float', 'string']);
+    $map[3.14] = 'pi';
+    $this->assertSame('pi', $map[3.14]);
+  }
+
+  public function test_offsetSet_Exception_TYPE_MISMATCH_in_key()
+  {
+    $this->expectExceptionCode(TYPE_MISMATCH);
+    $map = new Map([], ['map', 'float', 'string']);
+    $map['3.14'] = '3.14';
+  }
+
+  public function test_offsetSet_Exception_TYPE_MISMATCH_in_value()
+  {
+    $this->expectExceptionCode(TYPE_MISMATCH);
+    $map = new Map([], ['map', 'float', 'string']);
+    $map[3.14] = 3.14;
+  }
+
+  public function test_offsetUnset()
+  {
+    $map = new Map(['zero' => 0, 'one' => 1, 'two' => 2], ['map', 'string', 'int']);
+    unset($map['one']);
+    $this->assertSame([['zero', 0], ['two', 2]], $map->toArray());
+  }
+
+  public function test_offsetUnset_Exception_OFFSET_DOESNT_EXIST()
+  {
+    $this->expectExceptionCode(OFFSET_DOESNT_EXIST);
+    $map = new Map(['zero' => 0, 'one' => 1, 'two' => 2], ['map', 'string', 'int']);
+    unset($map['three']);
   }
 }

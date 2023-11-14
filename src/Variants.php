@@ -4,13 +4,6 @@ namespace Precise;
 class Variants extends TypedValue
 {
   /**
-   * Allowed methods and property names
-   */
-  protected array $isVariantMethods = [];
-  protected array $variantOrMethods = [];
-  protected array $variantProperties = [];
-
-  /**
    * Create a variant
    * @param array $values
    * @param ?array $type
@@ -19,20 +12,14 @@ class Variants extends TypedValue
   public function __construct(array $values, ?array $type = null, bool $unsafe = false)
   {
     parent::__construct($values, $type, $unsafe);
-    ksort($this->_type);
-
-    foreach ($type as $variant => $variantType) {
-      $variant = ltrim($variant, ':');
-      $lcfirstVariant = lcfirst($variant);
-      $ucfirstVariant = ucfirst($variant);
-      if (is_null($variantType)) {
-        $isVariantMethods[] = $variantOrMethods[] = $variantProperties[] = null;
-      } else {
-        $isVariantMethods[] = 'is' . $ucfirstVariant;
-        $variantOrMethods[] = $lcfirstVariant . 'Or';
-        $variantProperties[] = $lcfirstVariant;
-      }
+    
+    // Unify variants and sort the type
+    foreach ($this->_type as $variant => $variantType) {
+      $ucfirstVariant = ucfirst(ltrim($variant, ':'));
+      unset($this->_type[$variant]);
+      $this->_type[':' . $ucfirstVariant] = $variantType;
     }
+    ksort($this->_type);
 
     // Save values
     $variantIndex = self::getVariantIndex($values[0], $this->_type);
@@ -46,9 +33,9 @@ class Variants extends TypedValue
    * @param array $type
    * @return bool
    */
-  protected static function isCorectVariant($variant, array $type): bool
+  protected static function isCorrectVariant($variant, array $type): bool
   {
-    if (is_string($variant) && in_array(':' . $variant, array_keys($type))) {
+    if (is_string($variant) && (in_array(':' . ucfirst($variant), array_keys($type)) || in_array(':' . lcfirst($variant), array_keys($type)))) {
       return true;
     }
     if (is_int($variant) && $variant >= 0 && $variant < count($type)) {
@@ -68,7 +55,11 @@ class Variants extends TypedValue
     if (is_int($variant)) {
       return $variant;
     } else {
-      return array_search(':' . $variant, array_keys($type));
+      $result = array_search(':' . ucfirst($variant), array_keys($type));
+      if ($result === false) {
+        $result = array_search(':' . lcfirst($variant), array_keys($type));
+      }
+      return $result;
     }
   }
 
@@ -83,7 +74,11 @@ class Variants extends TypedValue
     if (is_int($variant)) {
       return $type[array_keys($type)[$variant]];
     } else {
-      return $type[':' . $variant];
+      if (key_exists(':' . ucfirst($variant), $type)) {
+        return $type[':' . ucfirst($variant)];
+      } else {
+        return $type[':' . lcfirst($variant)];
+      }
     }
   }
 
@@ -102,20 +97,20 @@ class Variants extends TypedValue
       return false;
     }
     if (!is_string($value[0]) && !is_int($value[0])) {
-      self::$lastTypeError = errMsg($path . '[0]', 'a string or an integer', $value);
+      self::$lastTypeError = errMsg($path . '[0]', 'a string or an integer', $value[0]);
       return false;
     }
-    if (!self::isCorectVariant($value[0], $type)) {
+    if (!self::isCorrectVariant($value[0], $type)) {
       if (is_int($value[0])) {
-        self::$lastTypeError = errMsg($path . '[0]', 'an integer in range [0...' . (count($type) - 1) . ']', $value);
+        self::$lastTypeError = errMsg($path . '[0]', 'an integer in range [0...' . (count($type) - 1) . ']', $value[0]);
       } else {
         $variants = array_map(function ($x) {
-          return ltrim($x, ':');
+          return ucfirst(ltrim($x, ':'));
         }, array_keys($type));
         self::$lastTypeError = errMsg(
           $path . '[0]',
           'any value from list ["' . implode('", "', $variants) . '"]',
-          $value
+          $value[0]
         );
       }
       return false;
@@ -123,7 +118,7 @@ class Variants extends TypedValue
     $variantType = self::getVariantType($value[0], $type);
     if (is_null($variantType)) {
       if (!is_null($value[1])) {
-        self::$lastTypeError = errMsg($path . '[1]', 'null', $value);
+        self::$lastTypeError = errMsg($path . '[1]', 'null', $value[1]);
         return false;
       }
     } else {
@@ -133,6 +128,19 @@ class Variants extends TypedValue
       }
     }
     return true;
+  }
+
+  /**
+   * Convert to PHP array
+   * @return array
+   */
+  public function toArray(bool $recursive = false): array
+  {
+    if ($recursive) {
+      return $this->jsonSerialize();
+    } else {
+      return $this->_ir;
+    }
   }
 
   /**
@@ -146,8 +154,8 @@ class Variants extends TypedValue
       (is_array($value) &&
         array_is_list($value) &&
         count($value) == 2 &&
-        self::isCorectVariant($value[0], $this->_type)) ||
-      (is_object($value) && $value instanceof TypedValue && $value->getType() == $this->_type)
+        self::isCorrectVariant($value[0], $this->_type)) ||
+      (is_object($value) && $value instanceof self && $value->getType() == $this->_type)
     ) {
       if (is_object($value)) {
         $value = $value->toArray();
@@ -177,16 +185,18 @@ class Variants extends TypedValue
    */
   public function __call(string $name, array $arguments): mixed
   {
-    if (false !== ($variantIndex = array_search($name, $this->isVariantMethods))) {
-      return $this->_ir[0] == $variantIndex;
+    if (substr($name, 0, 2) == 'is' && self::isCorrectVariant(substr($name, 2), $this->_type)) {
+      return $this->_ir[0] == self::getVariantIndex(substr($name, 2), $this->_type);
     }
-    if (false !== ($variantIndex = array_search($name, $this->variantOrMethods))) {
+    if (substr($name, -2) == 'Or' && self::isCorrectVariant(substr($name, 0, -2), $this->_type)) {
       if (count($arguments) != 1) {
         err('Missing required parameter for method ' . static::class . "::$name", VARIANT_MISSED_PARAM);
       }
-      return $this->_ir[0] == $variantIndex ? $this->_ir[1] : $arguments[0];
+      if (self::getVariantType(substr($name, 0, -2), $this->_type) != null) {
+        return $this->_ir[0] == self::getVariantIndex(substr($name, 0, -2), $this->_type) ? $this->_ir[1] : $arguments[0];
+      }
     }
-    err('Unknown method  ' . static::class . "::$name", VARIANT_UNKNOWN_METHOD);
+    err('Unknown method ' . static::class . "::$name", VARIANT_UNKNOWN_METHOD);
   }
 
   /**
@@ -194,22 +204,14 @@ class Variants extends TypedValue
    */
   public static function __callStatic(string $name, array $arguments): mixed
   {
-    static $allowedMethods = null;
-    if (is_null($allowedMethods)) {
-      if (static::$type) {
-        $allowedMethods = array_map(function ($x) {
-          return lcfirst(ltrim($x, ':'));
-        }, array_keys(static::$type));
-      } else {
-        $allowedMethods = [];
+    if (static::$type) {
+      if (self::isCorrectVariant($name, static::$type)) {
+        $variantIndex = self::getVariantIndex($name, static::$type);
+        $variantValue = count($arguments) > 0 ? $arguments[0] : null;
+        return new static([$variantIndex, $variantValue]); 
       }
     }
-    if (false !== ($variantIndex = array_search($name, $allowedMethods))) {
-      $variantValue = count($arguments) > 0 ? $arguments[0] : null;
-      return new static([$variantIndex, $variantValue]);
-    } else {
-      err('Unknown static method  ' . static::class . "::$name", VARIANT_UNKNOWN_METHOD);
-    }
+    err('Unknown static method ' . static::class . "::$name", VARIANT_UNKNOWN_METHOD);
   }
 
   /**
@@ -219,8 +221,8 @@ class Variants extends TypedValue
    */
   public function __get(string $propName): mixed
   {
-    if (false !== ($variantIndex = array_search($propName, $this->variantProperties))) {
-      if ($this->_ir[0] == $variantIndex) {
+    if (self::isCorrectVariant($propName, $this->_type) && self::getVariantType($propName, $this->_type) != null) {
+      if ($this->_ir[0] == self::getVariantIndex($propName, $this->_type)) {
         return $this->_ir[1];
       }
     }
@@ -234,12 +236,7 @@ class Variants extends TypedValue
    */
   public function __isset(string $propName): bool
   {
-    if (false !== ($variantIndex = array_search($propName, $this->variantProperties))) {
-      if ($this->_ir[0] == $variantIndex) {
-        return true;
-      }
-    }
-    return false;
+    return self::isCorrectVariant($propName, $this->_type) && self::getVariantType($propName, $this->_type) && $this->_ir[0] == self::getVariantIndex($propName, $this->_type);
   }
 
   /**

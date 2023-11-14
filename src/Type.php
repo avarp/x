@@ -24,7 +24,7 @@ abstract class Type
       err("Type \"$name\" already exists.", TYPE_ALREADY_EXISTS);
     }
 
-    // Register scalar type
+    // Register complex type
     if (is_string($definition) && class_exists($definition)) {
       if (in_array(TypedValue::class, class_parents($definition))) {
         self::$complexTypes[$name] = $definition;
@@ -34,7 +34,7 @@ abstract class Type
       }
     }
 
-    // Register complex type
+    // Register scalar type
     elseif (is_callable($definition, true)) {
       self::$scalarTypes[$name] = $definition;
       return;
@@ -78,7 +78,14 @@ abstract class Type
         if (count($type) == 1) {
           return ListOf::class;
         } else {
-          return Tuple::class;
+          $allValuesStartWithSemicolon = true;
+          foreach ($type as $t) {
+            if (!is_string($t) || $t[0] != ':') {
+              $allValuesStartWithSemicolon = false;
+              break;
+            }
+          }
+          return $allValuesStartWithSemicolon ? Enum::class : Tuple::class;
         }
       } else {
         $keys = array_keys($type);

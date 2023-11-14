@@ -11,7 +11,7 @@
   ],
   "autoload": {
     "psr-4": {
-      "Precise\\": "src/"
+      "Precise\\": ["src/", "src/Traits"]
     },
     "files": [
       "src/functions.php",

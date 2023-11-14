@@ -1,14 +1,10 @@
 <?php declare(strict_types=1);
 namespace Precise;
 
-use ArrayAccess;
-use Countable;
-use Iterator;
-
-class Tuple extends TypedValue implements Countable, ArrayAccess, Iterator
+class Tuple extends TypedValue implements \Countable, \ArrayAccess, \Iterator
 {
-  use Traits\Countable;
-  use Traits\Iterator;
+  use Countable;
+  use Iterator;
 
   /**
    * Create a tuple of values
@@ -21,6 +17,7 @@ class Tuple extends TypedValue implements Countable, ArrayAccess, Iterator
     parent::__construct($values, $type, $unsafe);
 
     // Save values
+    $this->_ir = [];
     foreach ($this->_type as $i => $elementType) {
       $this->_ir[$i] = purify($elementType, $values[$i]);
     }
@@ -65,7 +62,7 @@ class Tuple extends TypedValue implements Countable, ArrayAccess, Iterator
   {
     if (
       (is_array($value) && array_is_list($value) && count($value) == count($this->_ir)) ||
-      (is_object($value) && $value instanceof TypedValue && $value->getType() == $this->_type)
+      (is_object($value) && $value instanceof self && $value->getType() == $this->_type)
     ) {
       foreach ($value as $i => $v2) {
         $v1 = $this->_ir[$i];
@@ -103,7 +100,7 @@ class Tuple extends TypedValue implements Countable, ArrayAccess, Iterator
   public function offsetSet($offset, $value): void
   {
     // check offset
-    if (!is_int($offset) && key_exists($offset, $this->_ir)) {
+    if (!is_int($offset) || !key_exists($offset, $this->_ir)) {
       err("Offset \"$offset\" is out of bounds.", OFFSET_OUT_OF_BOUNDS);
     }
     // check value
@@ -111,7 +108,7 @@ class Tuple extends TypedValue implements Countable, ArrayAccess, Iterator
     if (Type::check($elementType, $value)) {
       $this->_ir[$offset] = purify($elementType, $value);
     } else {
-      err(Type::getLastError(), TYPE_ERROR);
+      err(Type::getLastError(), TYPE_MISMATCH);
     }
   }
 

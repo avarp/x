@@ -1,11 +1,9 @@
 <?php declare(strict_types=1);
 namespace Precise;
 
-use Iterator;
-
-class Record extends TypedValue implements Iterator
+class Record extends TypedValue implements \Iterator
 {
-  use Traits\Iterator;
+  use Iterator;
 
   /**
    * Create a record
@@ -19,6 +17,7 @@ class Record extends TypedValue implements Iterator
 
     // Save values
     ksort($this->_type);
+    $this->_ir = [];
     foreach ($this->_type as $propName => $propType) {
       $this->_ir[$propName] = purify($propType, $values[$propName]);
     }
@@ -34,16 +33,15 @@ class Record extends TypedValue implements Iterator
    */
   public static function checkType(array $type, $value, string $path = '$value'): bool
   {
-    if (!is_array($value)) {
-      self::$lastTypeError = errMsg($path, 'an array', $value);
+    if (!is_array($value) || array_is_list($value)) {
+      self::$lastTypeError = errMsg($path, 'an associative array', $value);
       return false;
     }
     $validKeys = array_keys($type);
     $givenKeys = array_keys($value);
-    asort($givenKeys);
-    if ($validKeys !== $givenKeys) {
-      $missedKeys = array_diff($validKeys, $givenKeys);
-      $extraKeys = array_diff($givenKeys, $validKeys);
+    $missedKeys = array_diff($validKeys, $givenKeys);
+    $extraKeys = array_diff($givenKeys, $validKeys);
+    if ($missedKeys || $extraKeys) {
       self::$lastTypeError = "$path has";
       if ($missedKeys) {
         self::$lastTypeError .=
@@ -78,7 +76,7 @@ class Record extends TypedValue implements Iterator
   {
     if (
       (is_array($value) && $this->irHasSameKeysAs($value)) ||
-      (is_object($value) && $value instanceof TypedValue && $value->getType() == $this->_type)
+      (is_object($value) && $value instanceof self && $value->getType() == $this->_type)
     ) {
       foreach ($value as $propName => $v2) {
         $v1 = $this->_ir[$propName];
@@ -128,7 +126,7 @@ class Record extends TypedValue implements Iterator
       if (Type::check($propType, $value)) {
         $this->_ir[$propName] = purify($propType, $value);
       } else {
-        err(Type::getLastError(), TYPE_ERROR);
+        err(Type::getLastError(), TYPE_MISMATCH);
       }
     } else {
       err("Unknown property \"$propName\"", RECORD_UNKNOWN_PROPERTY);

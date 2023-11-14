@@ -1,8 +1,7 @@
 <?php declare(strict_types=1);
-namespace Precise\Traits;
-use function Precise\err;
+namespace Precise;
 
-trait ListOfMethods
+trait MethodsForListOf
 {
   /**
    * Split the list into chunks
@@ -65,14 +64,14 @@ trait ListOfMethods
         if ($arg->getType() == $this->_type) {
           $otherLists[] = $arg->toArray();
         } else {
-          err("Argument #$i has different type than the original list.", \Precise\LIST_DIFF_TYPE_ERROR);
+          err("Argument #$i has different type than the original list.", LIST_DIFF_TYPE_MISMATCH);
         }
       } else {
         if (is_array($arg) && array_is_list($arg)) {
           if (self::checkType($this->_type, $arg, "\$args[$i]")) {
             $otherLists[] = $arg;
           } else {
-            err(self::$lastTypeError, \Precise\LIST_DIFF_TYPE_ERROR);
+            err(self::$lastTypeError, LIST_DIFF_TYPE_MISMATCH);
           }
         }
       }
@@ -113,7 +112,7 @@ trait ListOfMethods
     if (!is_string($start) && !is_string($end)) {
       return new ListOf(range($start, $end, $step), ['float']);
     }
-    err('Parameters\' types are incompatible with each other', \Precise\LIST_RANGE_WRONG_PARAMS);
+    err('Parameters\' types are incompatible with each other', LIST_RANGE_WRONG_PARAMS);
   }
 
   /**
@@ -211,7 +210,7 @@ trait ListOfMethods
     } else {
       err(
         'The product of values can be calculated only for lists of numbers (int or float).',
-        \Precise\LIST_PRODUCT_FAIL
+        LIST_PRODUCT_FAIL
       );
     }
   }
@@ -308,7 +307,7 @@ trait ListOfMethods
     if ($this->_type[0] == 'int' || $this->_type[0] == 'float') {
       return array_sum($this->_ir);
     } else {
-      err('The sum of values can be calculated only for lists of numbers (int or float).', \Precise\LIST_SUM_FAIL);
+      err('The sum of values can be calculated only for lists of numbers (int or float).', LIST_SUM_FAIL);
     }
   }
 

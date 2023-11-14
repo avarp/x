@@ -1,15 +1,11 @@
 <?php declare(strict_types=1);
 namespace Precise;
 
-use ArrayAccess;
-use Countable;
-use Iterator;
-
-class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
+class ListOf extends TypedValue implements \Countable, \ArrayAccess, \Iterator
 {
-  use Traits\Countable;
-  use Traits\Iterator;
-  use Traits\ListOfMethods;
+  use Countable;
+  use Iterator;
+  use MethodsForListOf;
 
   /**
    * Create a typed list
@@ -22,6 +18,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
     parent::__construct($values, $type, $unsafe);
 
     // Save values
+    $this->_ir = [];
     $elementsType = $this->_type[0];
     foreach ($values as $v) {
       $this->_ir[] = purify($elementsType, $v);
@@ -64,7 +61,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
   {
     if (
       (is_array($value) && count($value) == count($this->_ir)) ||
-      (is_object($value) && $value instanceof TypedValue && $value->getType() == $this->_type)
+      (is_object($value) && $value instanceof self && $value->getType() == $this->_type)
     ) {
       foreach ($value as $i => $v2) {
         $v1 = $this->_ir[$i];
@@ -75,6 +72,19 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
       return true;
     }
     return false;
+  }
+
+  /**
+   * Convert to PHP array
+   * @return array
+   */
+  public function toArray(bool $recursive = false): array
+  {
+    if ($recursive) {
+      return $this->jsonSerialize();
+    } else {
+      return $this->_ir;
+    }
   }
 
   /**
@@ -112,7 +122,7 @@ class ListOf extends TypedValue implements Countable, ArrayAccess, Iterator
     if (Type::check($elementsType, $value)) {
       $this->_ir[$offset] = purify($elementsType, $value);
     } else {
-      err(Type::getLastError(), TYPE_ERROR);
+      err(Type::getLastError(), TYPE_MISMATCH);
     }
   }
 

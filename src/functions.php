@@ -24,6 +24,7 @@ function errMsg(string $path, string $expectedType, $actualValue): string
 
 /**
  * Array index to ordinal number
+ * @internal
  * @param int $index
  * @return string
  */
@@ -39,6 +40,7 @@ function nth(int $index): string
 
 /**
  * Throw an exception.
+ * @internal
  * @param string $msg
  * @param int $code
  */
